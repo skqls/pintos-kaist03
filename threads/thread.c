@@ -179,6 +179,8 @@ thread_print_stats (void) {
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
+/*
+참고 : Each thread, therefore, acts like a mini-program running inside Pintos, with the function passed to thread_create() acting like main().*/
 tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
