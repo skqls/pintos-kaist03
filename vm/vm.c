@@ -66,7 +66,16 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
 
-	return page;
+	/* --- Project 3: VM --- */
+
+
+
+
+
+
+    /* --- Project 3: VM --- */ 
+	
+	// return page;
 }
 
 /* Insert PAGE into spt with validation. */
@@ -174,6 +183,11 @@ vm_do_claim_page (struct page *page) {
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+
+	/* --- Project 3: VM --- */
+	hash_init(&spt ->spt_hash, page_hash, page_less ,NULL);
+	/* --- Project 3: VM --- */
+
 }
 
 /* Copy supplemental page table from src to dst */
@@ -188,3 +202,43 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 }
+
+/* --- Project 3: VM --- */
+
+/*
+해시 테이블 초기화 시, 해당 해시 값을 구해주는 함수의 포인터이다. */
+unsigned page_hash (const struct hash_elem *p_ , void *aux UNUSED){
+	const struct page* p = hash_entry(p_, struct page, hash_elem); //hash_elem을 토대로 해당 페이지가 속한 해시 테이블의 주소를 가져옴
+	return hash_bytes(&p -> va, sizeof(p -> va));
+
+}
+
+/*
+해시 테이블 초기화 시, 해시 요소들을 비교하는 함수의 포인터이다. 
+a가 b보다 작으면 true를 반환한다. */
+static unsigned page_less(const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+	const struct page *p_a = hash_entry(a, struct page, hash_elem);
+	const struct page *p_b = hash_entry(b, struct page, hash_elem);
+	return p_a -> va < p_b -> va;
+
+}
+
+bool page_insert(struct hash *h, struct page *p){
+	 
+	 if(!hash_insert(h, &p -> hash_elem))
+	 	return true;
+	 else
+	 	return false;
+
+}
+
+bool page_delete(struct hash*h, struct page *p){
+
+	if (!hash_delete(h, &p ->hash_elem))
+		return true;
+	else 
+		return false;
+}
+
+/* --- Project 3: VM --- */
+

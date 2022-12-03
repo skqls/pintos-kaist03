@@ -658,6 +658,11 @@ static bool install_page (void *upage, void *kpage, bool writable);
  *
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
+/*
+Lazy Load와 구분되는 "load_segment()"의 특징 :
+프로젝트 3 진행 전, load_segment()는 함수의 실행에 필요한 모든 데이터를 메모리에 올려 실행한다. 실행 중 해당 데이터가
+필요 시, 메모리에 올리는 방식(lazy load)로 변경하는 것이 pj3의 목표다. 
+*/
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
       uint32_t read_bytes, uint32_t zero_bytes, bool writable) {

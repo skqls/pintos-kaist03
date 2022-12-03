@@ -39,6 +39,11 @@ struct hash_elem {
 	((STRUCT *) ((uint8_t *) &(HASH_ELEM)->list_elem        \
 		- offsetof (STRUCT, MEMBER.list_elem)))
 
+/* --- Project 3: VM --- */
+#define offsetof(TYPE, MEMBER) ((size_t)& ((TYPE*)0) ->MEMBER)
+/* --- Project 3: VM --- */
+
+
 /* Computes and returns the hash value for hash element E, given
  * auxiliary data AUX. */
 typedef uint64_t hash_hash_func (const struct hash_elem *e, void *aux);
@@ -96,5 +101,8 @@ bool hash_empty (struct hash *);
 uint64_t hash_bytes (const void *, size_t);
 uint64_t hash_string (const char *);
 uint64_t hash_int (int);
+
+
+
 
 #endif /* lib/kernel/hash.h */
