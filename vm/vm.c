@@ -4,6 +4,15 @@
 #include "vm/vm.h"
 #include "vm/inspect.h"
 
+
+/* --- Project 3: VM --- */
+struct list frame_table;
+static struct frame *vm_get_frame (void);
+bool vm_claim_page (void *va);
+bool vm_do_claim_page (struct page *page);
+
+/* --- Project 3: VM --- */
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -61,12 +70,25 @@ err:
 }
 
 /* Find VA from spt and return page. On error, return NULL. */
+/*
+인자로 받은 VA(가상주소)에 해당하는 페이지를 spt에서 찾아 반환한다. 
+*/
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
 
 	/* --- Project 3: VM --- */
+	
+    struct page* page = (struct page*)malloc(sizeof(struct page));
+    struct hash_elem *e;
+
+    page->va = pg_round_down(va);  
+    e = hash_find(&spt->spt_hash, &page->hash_elem); //e와 같은 해시값을 같는 페이지를 spt에서 얻은 뒤, hash_elem 구조체를 얻는다. 
+
+    free(page);
+
+    return e != NULL ? hash_entry(e, struct page, hash_elem) : NULL;
 
 
 
@@ -76,7 +98,9 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
     /* --- Project 3: VM --- */ 
 	
 	// return page;
+
 }
+
 
 /* Insert PAGE into spt with validation. */
 bool
@@ -85,7 +109,8 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 	int succ = false;
 	/* TODO: Fill this function. */
 
-	return succ;
+	return page_insert(&spt->spt_hash,page)
+	// return succ;
 }
 
 void
@@ -95,21 +120,57 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 }
 
 /* Get the struct frame, that will be evicted. */
+/* 프레임을 받아 제거한다
+*/
 static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
+
+	/* --- Project 3: VM --- */
+
+	 struct thread *curr = thread_current();
+	struct list_elem *e, *start;
+
+	for (start = e; start != list_end(&frame_table); start = list_next(start)) {
+		victim = list_entry(start, struct frame, frame_elem);
+		if (pml4_is_accessed(curr->pml4, victim->page->va))
+			pml4_set_accessed(curr->pml4, victim->page->va, 0);
+		else
+			return victim;
+	}
+
+	for (start = list_begin(&frame_table); start != e; start = list_next(start)) {
+		victim = list_entry(start, struct frame, frame_elem);
+		if (pml4_is_accessed(curr->pml4, victim->page->va))
+			pml4_set_accessed(curr->pml4, victim->page->va, 0);
+		else
+			return victim;
+	}
+
+	/* --- Project 3: VM --- */
+
 
 	return victim;
 }
 
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
+/* 
+해당 페이지에 속한 프레임의 공간을 디스크로 내리는 Swap-out을 실행하는 함수. 
+디스크로 내리고자 하는 프레임이 victim이다. 
+이 victim에 연결되어 있는 가상 페이지를 swap_out함수의 인자로 넣는다. 
+*/
 static struct frame *
 vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
+	struct frame *victim UNUSED = vm_get_victim (); //Vm_get_victim를 통해 제거
 	/* TODO: swap out the victim and return the evicted frame. */
 
+	/* --- Project 3: VM --- */
+	swap_out(victim->page); //swap_out은 define(매크로)되어 있다.
+							//swap_out함수는, page구조체 내의 멤버인 Operations	에 속한 swap_out에 대응한다. 
+	/* --- Project 3: VM --- */
+	
 	return NULL;
 }
 
@@ -117,13 +178,36 @@ vm_evict_frame (void) {
  * and return it. This always return valid address. That is, if the user pool
  * memory is full, this function evicts the frame to get the available memory
  * space.*/
+/*
+Vm_get_frame()함수는 Palloc_get_page()함수의 호출로 물리 페이지(프레임)을 할당 받는다. 
+*/
 static struct frame *
 vm_get_frame (void) {
-	struct frame *frame = NULL;
-	/* TODO: Fill this function. */
+	// struct frame *frame = NULL;
+	// /* TODO: Fill this function. */
 
+	// ASSERT (frame != NULL);
+	// ASSERT (frame->page == NULL);
+
+	/* --- Project 3: VM --- */
+
+	struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
+	
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
+	frame->kva = palloc_get_page(PAL_USER); //커널 풀 대신 사용자 풀에서 메모리를 할당하고자 PAL_USER사용
+	if (frame->kva == NULL) { 
+		frame = vm_evict_frame();  //만약 사용가능한 메모리가 없다면, 공간을 만들기 위해 현재 사용중인 프레임을 축출한다. 
+		frame->page = NULL;
+		return frame;
+	}
+	list_push_back(&frame_table, &frame->frame_elem);
+	frame->page = NULL;
+
+
+	/* --- Project 3: VM --- */
+
+
 	return frame;
 }
 
@@ -158,10 +242,22 @@ vm_dealloc_page (struct page *page) {
 }
 
 /* Claim the page that allocate on VA. */
+/*
+Claim()함수는 프레임을 페이지에 할당한다. vm_get_frame이 Frame을 가져오는 함수였다면, vm_claim_page는 인자의 va를 이용해
+spt에서 frame과 연결할 페이지를 찾는다. 
+*/
 bool
 vm_claim_page (void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
+
+	/* --- Project 3: VM --- */
+
+	page = spt_find_page(&thread_current()->spt, va);
+	if (page == NULL)
+		return false;
+
+	/* --- Project 3: VM --- */
 
 	return vm_do_claim_page (page);
 }
@@ -176,8 +272,15 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	/* --- Project 3: VM --- */
 
-	return swap_in (page, frame->kva);
+	if(install_page(page->va, frame->kva, page->writable)) {
+		return swap_in(page, frame->kva);
+	}
+	return false;
+
+	/* --- Project 3: VM --- */
+	// return swap_in (page, frame->kva);
 }
 
 /* Initialize new supplemental page table */

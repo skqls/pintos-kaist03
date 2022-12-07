@@ -78,6 +78,10 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+
+	/* --- Project 3: VM --- */
+	struct list_elem frame_elem;  //프레임을 리스트에 연결하고자 list_elem멤버를 추가한다. 
+	/* --- Project 3: VM --- */
 };
 
 /* The function table for page operations.
