@@ -25,6 +25,14 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+
+/* --- Project 3: VM --- */
+
+list_init(&frame_table);
+start = list_begin(&frame_table);
+
+/* --- Project 3: VM --- */
+
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -109,7 +117,7 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 	int succ = false;
 	/* TODO: Fill this function. */
 
-	return page_insert(&spt->spt_hash,page)
+	return page_insert(&spt->spt_hash,page);
 	// return succ;
 }
 
