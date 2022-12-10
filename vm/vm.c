@@ -222,6 +222,14 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+
+	/* --- Project 3: VM --- */
+	if (vm_alloc_page(VM_ANON| VM_MARKER_0, addr, 1)) {
+		vm_claim_page(addr);
+		thread_current()->stack_bottom -= PGSIZE;
+	}
+	/* --- Project 3: VM --- */
+
 }
 
 /* Handle the fault on write_protected page */
