@@ -212,33 +212,54 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-   char *file_name = f_name;
-   bool success;
+	char *file_name = f_name;
+	bool success;
 
-   /* We cannot use the intr_frame in the thread structure.
-    * This is because when current thread rescheduled,
-    * it stores the execution information to the member. */
-   struct intr_frame _if;
-   _if.ds = _if.es = _if.ss = SEL_UDSEG;
-   _if.cs = SEL_UCSEG;
-   _if.eflags = FLAG_IF | FLAG_MBS;
+	/* We cannot use the intr_frame in the thread structure.
+	 * This is because when current thread rescheduled,
+	 * it stores the execution information to the member. */
+	struct intr_frame _if;
+	_if.ds = _if.es = _if.ss = SEL_UDSEG;
+	_if.cs = SEL_UCSEG;
+	_if.eflags = FLAG_IF | FLAG_MBS;
 
-   /* We first kill the current context */
-   process_cleanup();
+	/* We first kill the current context */
+	process_cleanup ();
 
-   lock_acquire(&filesys_lock);
-   /* And then load the binary */
-   success = load (file_name, &_if);
-   /* If load failed, quit. */
-   lock_release(&filesys_lock);
-   palloc_free_page (file_name);
-   if (!success)
-      return -1;
+#ifdef VM
+	supplemental_page_table_init(&thread_current()->spt);
+#endif
+	char *argv[64]; 	
+	int argc = 0;		
 
-   /* Start switched process. */
-   do_iret (&_if);
-   NOT_REACHED ();
+	char *token;		
+	char *save_ptr;		
+	token = strtok_r(file_name, " ", &save_ptr);
+	while (token != NULL) {
+		argv[argc] = token;
+		token = strtok_r(NULL, " ", &save_ptr);
+		argc++;
+	}
+
+	/* And then load the binary */
+	success = load (file_name, &_if);
+
+	/* If load failed, quit. */
+	if (!success) {
+		palloc_free_page (file_name);
+		return -1;
+	}
+	void **rspp = &_if.rsp;
+	argument_stack(argv, argc, rspp);
+	_if.R.rdi = argc;
+	_if.R.rsi = (uint64_t)*rspp + sizeof(void *);
+
+	/* Start switched process. */
+	do_iret (&_if);
+	NOT_REACHED ();
 }
+
+
 
 
 /* Waits for thread TID to die and returns its exit status.  If
