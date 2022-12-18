@@ -65,14 +65,12 @@ inode_init (void) {
  * Returns true if successful.
  * Returns false if memory or disk allocation fails. */
 bool
-inode_create (disk_sector_t sector, off_t length) {
+inode_create (disk_sector_t sector, off_t length, bool isdir) {
 	struct inode_disk *disk_inode = NULL;
 	bool success = false;
 
 	ASSERT (length >= 0);
 
-	/* If this assertion fails, the inode structure is not exactly
-	 * one sector in size, and you should fix that. */
 	ASSERT (sizeof *disk_inode == DISK_SECTOR_SIZE);
 
 	disk_inode = calloc (1, sizeof *disk_inode);
@@ -80,17 +78,49 @@ inode_create (disk_sector_t sector, off_t length) {
 		size_t sectors = bytes_to_sectors (length);
 		disk_inode->length = length;
 		disk_inode->magic = INODE_MAGIC;
+		disk_inode->isdir = isdir;
+		#ifdef EFILESYS
+		
+		cluster_t clst = sector_to_cluster(sector); 
+		cluster_t newclst = clst; 
+
+		if(sectors == 0) disk_inode->start = cluster_to_sector(fat_create_chain(newclst));
+
+		for (int i = 0; i < sectors; i++){
+			newclst = fat_create_chain(newclst);
+			if (newclst == 0){ 
+				fat_remove_chain(clst, 0);
+				free(disk_inode);
+				return false;
+			}
+			if (i == 0){
+				clst = newclst;
+				disk_inode->start = cluster_to_sector(newclst); 
+			}
+		}
+		disk_write (filesys_disk, sector, disk_inode);
+		if (sectors > 0) {
+			static char zeros[DISK_SECTOR_SIZE];
+			for (i = 0; i < sectors; i++){
+				ASSERT(clst != 0 || clst != EOChain);
+				disk_write (filesys_disk, cluster_to_sector(clst), zeros); 
+				clst = fat_get(clst); 
+			}
+		}
+		success = true;
+		#else
 		if (free_map_allocate (sectors, &disk_inode->start)) {
 			disk_write (filesys_disk, sector, disk_inode);
 			if (sectors > 0) {
 				static char zeros[DISK_SECTOR_SIZE];
 				size_t i;
 
-				for (i = 0; i < sectors; i++) 
-					disk_write (filesys_disk, disk_inode->start + i, zeros); 
+				for (i = 0; i < sectors; i++)
+					disk_write (filesys_disk, disk_inode->start + i, zeros);
 			}
 			success = true; 
 		} 
+		#endif
 		free (disk_inode);
 	}
 	return success;
